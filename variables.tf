@@ -25,9 +25,21 @@ variable "codebuild_compute_type" {
   default = "BUILD_GENERAL1_SMALL"
 }
 
+variable "codebuild_description" {
+  description = "(Optional) description for CodeBuild project"
+  type        = string
+  default     = ""
+}
+
 variable "codebuild_image" {
   type    = string
   default = "aws/codebuild/amazonlinux2-aarch64-standard:3.0"
+}
+
+variable "codebuild_name" {
+  description = "(Optional) custom name for CodeBuild project"
+  type        = string
+  default     = ""
 }
 
 variable "codebuild_type" {
@@ -53,6 +65,7 @@ variable "codepipeline_cross_account_role_arn" {
 }
 
 variable "codepipeline_name" {
+  description = "(Optional) custom name for pipeline"
   type    = string
   default = ""
 }
