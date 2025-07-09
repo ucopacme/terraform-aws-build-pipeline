@@ -1,0 +1,49 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - "echo \"=== DEBUG: Buildspec from Terraform ===\""
+      - "echo \"Restoring NuGet packages...\""
+      - nuget restore src/UserManagementApp/UserManagementApp.sln
+      - "echo \"=== DEBUG: Current source directory ===\""
+      - "Get-ChildItem src"
+      - "Get-ChildItem $env:CODEBUILD_SRC_DIR_dependencies"
+
+      
+  build:
+    commands:
+      - "echo \"Build started on %date% %time%\""
+      - "echo \"Building the .NET Framework 4.8 application...\""
+      - "msbuild src/UserManagementApp/UserManagementApp.sln /p:Configuration=Release /p:Platform=\"Any CPU\" /p:OutputPath=bin\\Release /verbosity:minimal"
+      
+  post_build:
+    commands:
+      - "echo \"=== DEBUG: Current working directory ===\""
+      - "Get-Location"
+      - "echo \"=== DEBUG: Listing current directory contents ===\""
+      - "Get-ChildItem -Force"
+      - "echo \"=== DEBUG: Checking UserManagementApp project directory ===\""
+      - "Get-ChildItem src\\UserManagementApp"
+      - "echo \"=== DEBUG: Checking if bin directory exists ===\""
+      - "if (Test-Path src\\UserManagementApp\\bin) { echo \"bin directory found\" } else { echo \"bin directory NOT found\" }"
+      - "echo \"=== DEBUG: Listing bin contents if it exists ===\""
+      - "if (Test-Path src\\UserManagementApp\\bin) { Get-ChildItem src\\UserManagementApp\\bin -Recurse }"
+      - "echo \"=== DEBUG: Creating package for web deployment ===\""
+      - "msbuild src\\UserManagementApp\\UserManagementApp.csproj /t:Package /p:Configuration=Release /verbosity:minimal"
+      - "echo \"=== DEBUG: Checking if PackageTmp directory exists ===\""
+      - "if (Test-Path src\\UserManagementApp\\obj\\Release\\Package\\PackageTmp) { echo \"PackageTmp directory found\" } else { echo \"ERROR: PackageTmp directory NOT found\" }"
+      - "echo \"=== DEBUG: Listing PackageTmp contents ===\""
+      - "if (Test-Path src\\UserManagementApp\\obj\\Release\\Package\\PackageTmp) { Get-ChildItem src\\UserManagementApp\\obj\\Release\\Package\\PackageTmp -Recurse }"
+      
+artifacts:
+  files:
+    - '**/*'
+  base-directory: src/UserManagementApp/obj/Release/Package/PackageTmp
+  name: UserManagementApp-$(date +%Y-%m-%d)
+  secondary-artifacts:
+    provenance:
+      files:
+        - '**/*'
+      base-directory: src/UserManagementApp/obj/Release/Package/PackageTmp
+      name: UserManagementApp-Source-$(date +%Y-%m-%d)

@@ -63,22 +63,25 @@ data "aws_iam_policy_document" "codebuild_base" {
     ]
   }
 
-#  statement {
-#    sid       = "AllowECR"
-#    effect    = "Allow"
-#    resources = var.ecr_repository_arns
-#
-#    actions = [
-#      "ecr:BatchCheckLayerAvailability",
-#      "ecr:BatchGetImage",
-#      "ecr:BatchImportUpstreamImage",
-#      "ecr:CompleteLayerUpload",
-#      "ecr:GetDownloadUrlForLayer",
-#      "ecr:InitiateLayerUpload",
-#      "ecr:PutImage",
-#      "ecr:UploadLayerPart",
-#    ]
-#  }
+  dynamic "statement" {
+    for_each = length(var.ecr_repository_arns) > 0 ? [1] : []
+    content {
+      sid       = "AllowECR"
+      effect    = "Allow"
+      resources = var.ecr_repository_arns
+
+      actions = [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:BatchImportUpstreamImage",
+        "ecr:CompleteLayerUpload",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:InitiateLayerUpload",
+        "ecr:PutImage",
+        "ecr:UploadLayerPart",
+      ]
+    }
+  }
 
   statement {
     sid       = "AllowCloudWatchLogsCreateLogGroupsAndLogStreams"
@@ -139,6 +142,35 @@ resource "aws_codebuild_project" "this" {
     type = "CODEPIPELINE"
   }
 
+  dynamic "vpc_config" {
+    for_each = (
+      var.vpc_config != null && 
+      length(keys(var.vpc_config)) > 0 &&
+      try(var.vpc_config.vpc_id, null) != null &&
+      try(var.vpc_config.security_group_ids, null) != null &&
+      try(var.vpc_config.subnets, null) != null
+    ) ? [var.vpc_config] : []
+
+    content {
+      security_group_ids = vpc_config.value.security_group_ids
+      subnets            = vpc_config.value.subnets
+      vpc_id             = vpc_config.value.vpc_id
+    }
+  }
+  dynamic "secondary_artifacts" {
+    for_each = var.secondary_artifact != null ? var.secondary_artifact : []
+
+    content {
+      artifact_identifier = "provenance"
+      name = secondary_artifacts.value.name
+      type = secondary_artifacts.value.type != null ? secondary_artifacts.value.type : "CODEPIPELINE"
+      namespace_type = "BUILD_ID"
+      path = secondary_artifacts.value.path != null ? secondary_artifacts.value.path : join("/", [var.APP_NAME, var.APP_ENVIRONMENT, "build", "provenance"])
+      location = secondary_artifacts.value.type == "S3" ? secondary_artifacts.value.bucket : null
+      packaging = secondary_artifacts.value.type == "S3" ? secondary_artifacts.value.packaging : "ZIP"
+    }
+  }
+
   environment {
     compute_type    = var.codebuild_compute_type
     image           = var.codebuild_image
@@ -165,12 +197,8 @@ resource "aws_codebuild_project" "this" {
 
   source {
     type      = "CODEPIPELINE"
-    buildspec = "buildspec.yml"
+    buildspec = var.tf_buildspec != "" ? file(var.tf_buildspec) : "buildspec.yml"
   }
-
-  #  lifecycle {
-  #    ignore_changes = [environment]
-  #  }
 
   tags = var.tags
 }

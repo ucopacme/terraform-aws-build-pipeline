@@ -131,17 +131,17 @@ resource "aws_iam_role" "pipeline" {
 # verified as unused via review of CloudTrail.  See also:
 # https://docs.aws.amazon.com/codepipeline/latest/userguide/security-iam.html#how-to-custom-role
 data "aws_iam_policy_document" "pipeline_base" {
-#  statement {
-#    effect    = "Allow"
-#    resources = ["*"]
-#    actions   = ["iam:PassRole"]
-#
-#    condition {
-#      test     = "StringEqualsIfExists"
-#      variable = "iam:PassedToService"
-#      values   = ["ecs-tasks.amazonaws.com"]
-#    }
-#  }
+  #  statement {
+  #    effect    = "Allow"
+  #    resources = ["*"]
+  #    actions   = ["iam:PassRole"]
+  #
+  #    condition {
+  #      test     = "StringEqualsIfExists"
+  #      variable = "iam:PassedToService"
+  #      values   = ["ecs-tasks.amazonaws.com"]
+  #    }
+  #  }
 
   statement {
     effect    = "Allow"
@@ -157,29 +157,29 @@ data "aws_iam_policy_document" "pipeline_base" {
     ]
   }
 
-#  statement {
-#    effect    = "Allow"
-#    resources = ["*"]
-#
-#    actions = [
-#      "codedeploy:CreateDeployment",
-#      "codedeploy:GetApplication",
-#      "codedeploy:GetApplicationRevision",
-#      "codedeploy:GetDeployment",
-#      "codedeploy:GetDeploymentConfig",
-#      "codedeploy:RegisterApplicationRevision",
-#    ]
-#  }
+  #  statement {
+  #    effect    = "Allow"
+  #    resources = ["*"]
+  #
+  #    actions = [
+  #      "codedeploy:CreateDeployment",
+  #      "codedeploy:GetApplication",
+  #      "codedeploy:GetApplicationRevision",
+  #      "codedeploy:GetDeployment",
+  #      "codedeploy:GetDeploymentConfig",
+  #      "codedeploy:RegisterApplicationRevision",
+  #    ]
+  #  }
 
-#  statement {
-#    effect    = "Allow"
-#    resources = ["*"]
-#
-#    actions = [
-#      "ecs:RegisterTaskDefinition",
-#      "ecs:TagResource",
-#    ]
-#  }
+  #  statement {
+  #    effect    = "Allow"
+  #    resources = ["*"]
+  #
+  #    actions = [
+  #      "ecs:RegisterTaskDefinition",
+  #      "ecs:TagResource",
+  #    ]
+  #  }
 
   statement {
     effect    = "Allow"
@@ -255,6 +255,9 @@ resource "aws_iam_role_policy" "pipeline" {
 }
 
 resource "aws_codepipeline" "this" {
+  # if skip_default_pipeline is true, do not create the default pipeline
+  count = var.skip_default_pipeline ? 0 : 1
+
   name     = "${local.codepipeline_name}-pipeline"
   role_arn = aws_iam_role.pipeline.arn
 
@@ -273,19 +276,39 @@ resource "aws_codepipeline" "this" {
   stage {
     name = "Source"
 
-    action {
-      name             = "Source"
-      role_arn         = var.codepipeline_cross_account_role_arn
-      category         = "Source"
-      owner            = "AWS"
-      provider         = "CodeCommit"
-      version          = "1"
-      output_artifacts = ["SourceArtifact"]
+    dynamic "action" {
+      for_each = var.secondary_sources != null ? var.secondary_sources : []
 
+      content {
+        name             = action.value.name != null ? action.value.name : "DependenciesSource"
+        role_arn         = var.codepipeline_cross_account_role_arn
+        category         = action.value.category != null ? action.value.category : "Source"
+        owner            = action.value.owner != null ? action.value.owner : "AWS"
+        provider         = action.value.provider != null ? action.value.provider : "CodeCommit"
+        version          = action.value.version != null ? action.value.version : "1"
+        output_artifacts = [action.value.output_artifact != null ? action.value.output_artifact : "DependencyArtifact"]
+
+        configuration = {
+          RepositoryName       = action.value.repository_name
+          BranchName           = action.value.branch_name
+          PollForSourceChanges = action.value.poll_for_source_changes != null ? action.value.poll_for_source_changes : "false"
+        }
+      }
+    }
+
+    action {
+      name     = "Source"
+      role_arn = var.codepipeline_cross_account_role_arn
+      category = "Source"
+      owner    = "AWS"
+      provider = "CodeCommit"
+      version  = "1"
+      # Concatenate extra sources
+      output_artifacts = ["SourceArtifact"]
       configuration = {
         RepositoryName       = var.repository_name
         BranchName           = var.branchname
-        PollForSourceChanges = "false"
+        PollForSourceChanges = var.poll_for_source_changes != null ? var.poll_for_source_changes : "false"
       }
     }
   }
@@ -293,16 +316,30 @@ resource "aws_codepipeline" "this" {
   stage {
     name = "Build"
     action {
-      name             = "Build"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceArtifact"]
+      name     = "Build"
+      category = "Build"
+      owner    = "AWS"
+      provider = "CodeBuild"
+      version  = "1"
+      # Include all artifacts from the previous source stage
+      input_artifacts = (
+        length(var.secondary_sources) > 0
+        ? concat(
+          ["SourceArtifact"],
+          [
+            for source in var.secondary_sources :
+            source.output_artifact != null
+            ? source.output_artifact
+            : "DependencyArtifact"
+          ]
+        )
+        : ["SourceArtifact"]
+      )
       output_artifacts = ["BuildArtifact"]
 
       configuration = {
-        ProjectName = aws_codebuild_project.this.name
+        PrimarySource = "SourceArtifact"
+        ProjectName   = aws_codebuild_project.this.name
       }
     }
   }
