@@ -101,6 +101,20 @@ data "aws_iam_policy_document" "codebuild_base" {
 
     actions = ["logs:PutLogEvents"]
   }
+
+  # for secrets access, create additional statement block here
+  dynamic "statement" {
+    for_each = var.codebuild_secret_arns != null ? var.codebuild_secret_arns : []
+    content {
+      effect = "Allow"
+      actions = [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ]
+      sid = "AllowSecretsManagerAccess"
+      resources = [statement.value]
+    }
+  }
 }
 
 data "aws_iam_policy_document" "codebuild_kms" {

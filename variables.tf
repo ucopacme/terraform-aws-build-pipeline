@@ -187,3 +187,9 @@ variable "poll_for_source_changes" {
   type        = string
   default     = "false"
 }
+
+variable "codebuild_secret_arns" {
+  description = "List of ARNs of Secrets Manager secrets to be made available to CodeBuild project"
+  type        = list(string)
+  default     = []
+}
