@@ -158,7 +158,7 @@ resource "aws_codebuild_project" "this" {
 
   dynamic "vpc_config" {
     for_each = (
-      var.vpc_config != null && 
+      var.vpc_config != null &&
       length(keys(var.vpc_config)) > 0 &&
       try(var.vpc_config.vpc_id, null) != null &&
       try(var.vpc_config.security_group_ids, null) != null &&
@@ -182,6 +182,25 @@ resource "aws_codebuild_project" "this" {
       path = secondary_artifacts.value.path != null ? secondary_artifacts.value.path : join("/", [var.APP_NAME, var.APP_ENVIRONMENT, "build", "provenance"])
       location = secondary_artifacts.value.type == "S3" ? secondary_artifacts.value.bucket : null
       packaging = secondary_artifacts.value.type == "S3" ? secondary_artifacts.value.packaging : "ZIP"
+    }
+  }
+  dynamic "file_system_locations" {
+    for_each = (
+      var.file_system_locations != null &&
+      length(keys(var.file_system_locations)) > 0 &&
+      try(var.file_system_locations.identifier, null) != null &&
+      try(var.file_system_locations.location, null) != null &&
+      try(var.file_system_locations.mount_options, null) != null &&
+      try(var.file_system_locations.mount_point, null) != null &&
+      try(var.file_system_locations.type, null) != null
+    ) ? [var.file_system_locations] : []
+
+    content {
+      identifier    = file_system_locations.value.identifier
+      location      = file_system_locations.value.location
+      mount_options = file_system_locations.value.mount_options
+      mount_point   = file_system_locations.value.mount_point
+      type          = file_system_locations.value.type
     }
   }
 

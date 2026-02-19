@@ -165,6 +165,18 @@ variable "vpc_config" {
   default = {}
 }
 
+variable "file_system_locations" {
+  description = "EFS file_system_locations block"
+  type = object({
+    identifier    = optional(string)
+    location      = optional(string)
+    mount_options = optional(string)
+    mount_point   = optional(string)
+    type          = optional(string)
+  })
+  default = {}
+}
+
 variable "ecr_repository_arns" {
   description = "ECR repository ARNs to be used by CodeBuild project"
   type        = list(string)
