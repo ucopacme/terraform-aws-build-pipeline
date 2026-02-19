@@ -211,3 +211,9 @@ variable "codebuild_secret_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "codebuild_iam_policy" {
+  description = "IAM policy for codebuild role"
+  type        = string
+  default     = null
+}

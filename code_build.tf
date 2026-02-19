@@ -134,12 +134,23 @@ data "aws_iam_policy_document" "codebuild_kms" {
 }
 
 data "aws_iam_policy_document" "codebuild" {
-  source_policy_documents = var.codepipeline_kms_key_arn == null ? [
+  source_policy_documents = var.codepipeline_kms_key_arn == null && var.codebuild_iam_policy == null ? [
     data.aws_iam_policy_document.codebuild_base.json
-    ] : [
-    data.aws_iam_policy_document.codebuild_base.json,
-    data.aws_iam_policy_document.codebuild_kms[0].json
-  ]
+    ] : (
+      var.codepipeline_kms_key_arn == null && var.codebuild_iam_policy != null ? [
+        data.aws_iam_policy_document.codebuild_base.json,
+        var.codebuild_iam_policy
+      ] : (
+        var.codepipeline_kms_key_arn != null && var.codebuild_iam_policy == null ? [
+          data.aws_iam_policy_document.codebuild_base.json,
+          data.aws_iam_policy_document.codebuild_kms[0].json
+        ] : [
+          data.aws_iam_policy_document.codebuild_base.json,
+          data.aws_iam_policy_document.codebuild_kms[0].json,
+          var.codebuild_iam_policy
+        ]
+      )
+    )
 }
 
 resource "aws_iam_role_policy" "codebuild" {
