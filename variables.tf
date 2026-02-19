@@ -103,6 +103,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "EXTRA_ENV_VARS" {
+  description = "Additional environment variables to pass to CodeBuild"
+  type        = map(string)
+  default     = {}
+}
+
 variable "APP_ENVIRONMENT" {
   description = "Environment variable for consumption in CodeBuild (usually set to ucop:environment tag)"
   type        = string

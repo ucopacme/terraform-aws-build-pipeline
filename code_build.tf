@@ -161,6 +161,14 @@ resource "aws_codebuild_project" "this" {
       name  = "AWS_DEFAULT_REGION"
       value = var.region
     }
+
+    dynamic "environment_variable" {
+      for_each = var.EXTRA_ENV_VARS
+      content {
+        name  = environment_variable.key
+        value = environment_variable.value
+      }
+    }
   }
 
   source {
