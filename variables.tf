@@ -20,6 +20,11 @@ variable "cloudwatch_event_rule_state" {
   default     = "ENABLED"
 }
 
+variable "codebuild_build_timeout" {
+  type    = number
+  default = 60
+}
+
 variable "codebuild_compute_type" {
   type    = string
   default = "BUILD_GENERAL1_SMALL"
